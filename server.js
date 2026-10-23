@@ -1,9 +1,13 @@
 const path = require("path");
 const express = require("express");
-const Database = require("better-sqlite3");
+const { Pool } = require("pg");
 
 const PORT = process.env.PORT || 3001;
-const DB_PATH = path.join(__dirname, "data.db");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 const app = express();
 app.set("trust proxy", 1);
@@ -11,29 +15,28 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "1kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS pig_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    count INTEGER NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-`);
-
-const insertEvent = db.prepare("INSERT INTO pig_events (count) VALUES (?)");
-const sumTotal = db.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM pig_events");
-const sumToday = db.prepare(`
-  SELECT COALESCE(SUM(count), 0) AS n
+const STATS_SQL = `
+  SELECT SUM(count) AS total,
+         SUM(CASE WHEN created_at >= CURRENT_DATE THEN count ELSE 0 END) AS today
   FROM pig_events
-  WHERE date(created_at, 'localtime') = date('now', 'localtime')
-`);
+`;
 
-function getStats() {
-  return {
-    totalPigs: sumTotal.get().n,
-    todayPigs: sumToday.get().n,
-  };
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pig_events (
+      id SERIAL PRIMARY KEY,
+      count INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+}
+
+async function getStats() {
+  const { rows } = await pool.query(STATS_SQL);
+  const row = rows[0] || {};
+  const totalPigs = Number(row.total) || 0;
+  const todayPigs = Number(row.today) || 0;
+  return { totalPigs, todayPigs };
 }
 
 const postHits = new Map();
@@ -67,24 +70,51 @@ setInterval(() => {
   }
 }, 60 * 1000).unref();
 
+pool.on("error", (err) => {
+  console.error("unexpected postgres pool error", err);
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/stats", (_req, res) => {
-  res.json(getStats());
+app.get("/api/stats", async (_req, res) => {
+  try {
+    const stats = await getStats();
+    res.json({ totalPigs: stats.totalPigs, todayPigs: stats.todayPigs });
+  } catch (err) {
+    console.error("failed to read stats", err);
+    res.status(500).json({ ok: false, error: "db_error" });
+  }
 });
 
-app.post("/api/stats/pigs", limitPigPosts, (req, res) => {
+app.post("/api/stats/pigs", limitPigPosts, async (req, res) => {
   const count = req.body && req.body.count;
   if (!Number.isInteger(count) || count < 1 || count > 50) {
     return res.status(400).json({ ok: false, error: "invalid_count" });
   }
-  insertEvent.run(count);
-  const stats = getStats();
-  res.json({ ok: true, totalPigs: stats.totalPigs, todayPigs: stats.todayPigs });
+  try {
+    await pool.query("INSERT INTO pig_events (count) VALUES ($1)", [count]);
+    const stats = await getStats();
+    res.json({ ok: true, totalPigs: stats.totalPigs, todayPigs: stats.todayPigs });
+  } catch (err) {
+    console.error("failed to record pig event", err);
+    res.status(500).json({ ok: false, error: "db_error" });
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`pixel pig catch listening on ${PORT}`);
+async function start() {
+  if (!process.env.DATABASE_URL) {
+    console.error("DATABASE_URL is required");
+    process.exit(1);
+  }
+  await initDb();
+  app.listen(PORT, () => {
+    console.log(`pixel pig catch listening on ${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("failed to start server", err);
+  process.exit(1);
 });
