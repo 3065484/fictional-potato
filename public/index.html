@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#4aa7b8" />
+    <title>中国猪能飞</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="game" width="320" height="480"></canvas>
+      <div id="scanlines" aria-hidden="true"></div>
+
+      <div id="hud" class="hidden">
+        <div class="hud-chip pixel-panel">
+          <span class="px-icon px-pig" aria-hidden="true"></span>
+          <span id="score" class="pixel-num">0</span>
+        </div>
+      </div>
+
+      <div id="start-screen" class="overlay">
+        <div class="panel pixel-panel">
+          <div class="title-row">
+            <span class="px-icon px-pig lg" aria-hidden="true"></span>
+            <h1>像素接猪</h1>
+            <span class="px-icon px-pig lg" aria-hidden="true"></span>
+          </div>
+          <p class="howto">拖动篮子接住掉下来的小猪<br />漏接一只就结束</p>
+          <p id="start-stats" class="global-stats">全球统计加载中...</p>
+          <button type="button" id="btn-start" class="pixel-btn">开始游戏</button>
+        </div>
+      </div>
+
+      <div id="end-screen" class="overlay hidden">
+        <div class="panel pixel-panel">
+          <h2>游戏结束</h2>
+          <p id="end-message" class="end-message">你一共接到了 0 只猪</p>
+          <p id="end-stats" class="global-stats">全球统计加载中...</p>
+          <button type="button" id="btn-retry" class="pixel-btn">再玩一次</button>
+        </div>
+      </div>
+    </div>
+    <script src="/game.js"></script>
+  </body>
+</html>

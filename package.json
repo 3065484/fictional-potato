@@ -1,0 +1,17 @@
+{
+  "name": "pixel-pig-catch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pixel pig catching game with global catch stats",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "express": "^4.21.2"
+  }
+}
